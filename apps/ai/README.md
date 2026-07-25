@@ -38,7 +38,7 @@ src/
 ```bash
 bun install                          # from repo root
 bun run build:client                 # build @veemon/api-client types (once)
-bun --filter @veemon/ai run dev        # http://localhost:4111 (watch mode)
+bun run --filter @veemon/ai dev        # http://localhost:4111 (watch mode)
 ```
 
 Running the **agents** requires an Anthropic API key (`.env`, see `.env.example`);
@@ -86,6 +86,6 @@ See the header of `src/application/tools/list-users.ts`.
 ## Test / typecheck
 
 ```bash
-bun --filter @veemon/ai run test       # tool logic against a fake UserDirectory
-bun --filter @veemon/ai run typecheck  # tsc --noEmit
+bun run --filter @veemon/ai test       # tool logic against a fake UserDirectory
+bun run --filter @veemon/ai typecheck  # tsc --noEmit
 ```

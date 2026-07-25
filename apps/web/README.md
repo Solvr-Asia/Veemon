@@ -8,7 +8,7 @@ Tauri v2 desktop shell. Talks to the Go API (`apps/api`) through the shared
 
 ```bash
 bun install                 # from repo root
-bun --filter @veemon/web run dev      # browser dev server on http://localhost:5173
+bun run --filter @veemon/web dev      # browser dev server on http://localhost:5173
 ```
 
 Set the API base URL via `.env` (see `.env.example`); it defaults to
@@ -22,14 +22,14 @@ The desktop shell in `src-tauri/` requires a **Rust toolchain** (`rustup`,
 not. Once Rust is installed:
 
 ```bash
-bun --filter @veemon/web run tauri:dev     # desktop window (spawns Vite)
-bun --filter @veemon/web run tauri:build   # production desktop bundle
+bun run --filter @veemon/web tauri:dev     # desktop window (spawns Vite)
+bun run --filter @veemon/web tauri:build   # production desktop bundle
 ```
 
 Generate the bundle icons once (writes `src-tauri/icons/`):
 
 ```bash
-bun --filter @veemon/web run tauri icon path/to/logo.png
+bun run --filter @veemon/web tauri icon path/to/logo.png
 ```
 
 ## Security notes
