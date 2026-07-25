@@ -262,7 +262,7 @@ func bindQueryParams(g *protogen.GeneratedFile, m *protogen.Method, skip map[str
 		if skip[jsonName] {
 			continue
 		}
-		// Fiber v3 removed the typed QueryInt/QueryBool accessors in favour of the
+		// Fiber v3 removed the typed QueryInt/QueryBool accessors in favor of the
 		// generic fiber.Query[T] helper. Defaults stay explicit so a missing or
 		// unparseable value still yields the zero value, as in v2.
 		fiberQuery := g.QualifiedGoIdent(fiberPkg.Ident("Query"))
