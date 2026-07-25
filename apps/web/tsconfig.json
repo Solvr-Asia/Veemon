@@ -3,7 +3,10 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "noEmit": true,
-    "allowImportingTsExtensions": false
+    "allowImportingTsExtensions": false,
+    // TS 7 no longer auto-discovers @types/* through Bun's symlinked store,
+    // so `bun:test` must be requested explicitly.
+    "types": ["bun"]
   },
   "include": ["src", "vite.config.ts"]
 }

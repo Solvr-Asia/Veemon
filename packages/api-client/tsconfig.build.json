@@ -1,6 +1,10 @@
 {
   "extends": "@veemon/tsconfig/base.json",
   "compilerOptions": {
+    // TS 7 requires rootDir to be explicit rather than inferred from the
+    // common source directory (TS5011). "src" matches what TS 5 inferred,
+    // so the dist/ layout is unchanged.
+    "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
     "noEmit": false
