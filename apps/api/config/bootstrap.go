@@ -17,7 +17,7 @@ import (
 	"veemon/pkg/token"
 	"veemon/repository/user_repository"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -98,7 +98,7 @@ func registerObservabilityRoutes(app *fiber.App, cfg *Config) {
 // metricsAuth optionally guards the /metrics endpoint with a bearer token. When
 // no token is configured it is a pass-through (restrict at the network layer).
 func metricsAuth(token string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if token == "" {
 			return c.Next()
 		}
@@ -134,14 +134,14 @@ func createTokenValidator(tokenService *token.TokenService, guard *authguard.Gua
 }
 
 func registerHealthChecks(b *BootstrapConfig) {
-	b.App.Get("/health", func(c *fiber.Ctx) error {
+	b.App.Get("/health", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status":  "ok",
 			"service": b.Cfg.ServiceName,
 		})
 	})
 
-	b.App.Get("/ready", func(c *fiber.Ctx) error {
+	b.App.Get("/ready", func(c fiber.Ctx) error {
 		checks := make(map[string]string)
 
 		// Check database

@@ -5,7 +5,7 @@ package user
 
 import (
 	context "context"
-	v2 "github.com/gofiber/fiber/v2"
+	v3 "github.com/gofiber/fiber/v3"
 	proto "google.golang.org/protobuf/proto"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	time "time"
@@ -31,7 +31,7 @@ var UserApiAuthConfig = map[string]middleware.AuthConfig{
 
 // RegisterUserApiRoutes registers all REST routes for UserApi on router,
 // applying per-route auth and rate limiting declared in the proto.
-func RegisterUserApiRoutes(router v2.Router, srv UserApiServer, validator middleware.TokenValidator) {
+func RegisterUserApiRoutes(router v3.Router, srv UserApiServer, validator middleware.TokenValidator) {
 	router.Post("/api/v1/auth/register", _UserApi_rateLimit(10, 60*time.Second), _UserApi_Register(srv))
 	router.Post("/api/v1/auth/login", _UserApi_rateLimit(10, 60*time.Second), _UserApi_Login(srv))
 	router.Post("/api/v1/auth/refresh", middleware.AuthMiddleware(validator, middleware.AuthConfig{NeedAuth: true, AllowedRoles: nil}), _UserApi_RefreshToken(srv))
@@ -43,10 +43,10 @@ func RegisterUserApiRoutes(router v2.Router, srv UserApiServer, validator middle
 	router.Delete("/api/v1/users/:id", middleware.AuthMiddleware(validator, middleware.AuthConfig{NeedAuth: true, AllowedRoles: []string{"admin", "superadmin"}}), _UserApi_DeleteUser(srv))
 }
 
-func _UserApi_Register(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_Register(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req RegisterReq
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return response.BadRequest(c, 400, "invalid request body")
 		}
 		ctx := _UserApi_ctx(c)
@@ -58,10 +58,10 @@ func _UserApi_Register(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_Login(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_Login(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req LoginReq
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return response.BadRequest(c, 400, "invalid request body")
 		}
 		ctx := _UserApi_ctx(c)
@@ -73,8 +73,8 @@ func _UserApi_Login(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_RefreshToken(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_RefreshToken(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req RefreshTokenReq
 		ctx := _UserApi_ctx(c)
 		res, err := srv.RefreshToken(ctx, &req)
@@ -85,8 +85,8 @@ func _UserApi_RefreshToken(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_GetMe(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_GetMe(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		req := &emptypb.Empty{}
 		ctx := _UserApi_ctx(c)
 		res, err := srv.GetMe(ctx, req)
@@ -97,8 +97,8 @@ func _UserApi_GetMe(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_Logout(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_Logout(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		req := &emptypb.Empty{}
 		ctx := _UserApi_ctx(c)
 		res, err := srv.Logout(ctx, req)
@@ -109,11 +109,11 @@ func _UserApi_Logout(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_ListUsers(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_ListUsers(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req ListUsersReq
-		req.Page = int32(c.QueryInt("page", 0))
-		req.Size = int32(c.QueryInt("size", 0))
+		req.Page = v3.Query[int32](c, "page", 0)
+		req.Size = v3.Query[int32](c, "size", 0)
 		req.Search = c.Query("search")
 		req.SortBy = c.Query("sortBy")
 		req.SortOrder = c.Query("sortOrder")
@@ -130,8 +130,8 @@ func _UserApi_ListUsers(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_GetUser(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_GetUser(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req GetUserReq
 		req.Id = c.Params("id")
 		ctx := _UserApi_ctx(c)
@@ -143,10 +143,10 @@ func _UserApi_GetUser(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_UpdateUser(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_UpdateUser(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req UpdateUserReq
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return response.BadRequest(c, 400, "invalid request body")
 		}
 		req.Id = c.Params("id")
@@ -159,8 +159,8 @@ func _UserApi_UpdateUser(srv UserApiServer) v2.Handler {
 	}
 }
 
-func _UserApi_DeleteUser(srv UserApiServer) v2.Handler {
-	return func(c *v2.Ctx) error {
+func _UserApi_DeleteUser(srv UserApiServer) v3.Handler {
+	return func(c v3.Ctx) error {
 		var req DeleteUserReq
 		req.Id = c.Params("id")
 		ctx := _UserApi_ctx(c)
@@ -174,8 +174,8 @@ func _UserApi_DeleteUser(srv UserApiServer) v2.Handler {
 
 // _UserApi_ctx propagates the auth context (if present) into the
 // request context passed to the handler.
-func _UserApi_ctx(c *v2.Ctx) context.Context {
-	ctx := c.UserContext()
+func _UserApi_ctx(c v3.Ctx) context.Context {
+	ctx := c.Context()
 	if ac, ok := middleware.GetAuthContext(c); ok {
 		ctx = middleware.WithAuthContext(ctx, ac)
 	}
@@ -184,7 +184,7 @@ func _UserApi_ctx(c *v2.Ctx) context.Context {
 
 // _UserApi_error renders a handler error: AppError values keep their
 // status/message; anything else becomes a sanitized 500.
-func _UserApi_error(c *v2.Ctx, err error) error {
+func _UserApi_error(c v3.Ctx, err error) error {
 	if appErr, ok := err.(*errors.AppError); ok {
 		return appErr.FiberError(c)
 	}
@@ -192,7 +192,7 @@ func _UserApi_error(c *v2.Ctx, err error) error {
 }
 
 // _UserApi_rateLimit builds a fixed-window per-IP limiter middleware.
-func _UserApi_rateLimit(max int, window time.Duration) v2.Handler {
+func _UserApi_rateLimit(max int, window time.Duration) v3.Handler {
 	cfg := middleware.DefaultRateLimitConfig()
 	cfg.Max = max
 	cfg.Duration = window

@@ -8,7 +8,7 @@ import (
 
 	"veemon/pkg/errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // ctxKey is an unexported type for context keys defined in this package,
@@ -49,7 +49,7 @@ type AuthConfig struct {
 type TokenValidator func(token string) (*AuthContext, error)
 
 func AuthMiddleware(validator TokenValidator, config AuthConfig) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if !config.NeedAuth {
 			return c.Next()
 		}
@@ -83,12 +83,12 @@ func AuthMiddleware(validator TokenValidator, config AuthConfig) fiber.Handler {
 	}
 }
 
-func GetAuthContext(c *fiber.Ctx) (*AuthContext, bool) {
+func GetAuthContext(c fiber.Ctx) (*AuthContext, bool) {
 	auth, ok := c.Locals("auth").(*AuthContext)
 	return auth, ok
 }
 
-func MustGetAuthContext(c *fiber.Ctx) *AuthContext {
+func MustGetAuthContext(c fiber.Ctx) *AuthContext {
 	auth, ok := GetAuthContext(c)
 	if !ok {
 		panic("auth context not found")

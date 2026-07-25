@@ -4,28 +4,50 @@ package docs
 import (
 	"encoding/json"
 
-	"github.com/gofiber/fiber/v2"
-	scalar "github.com/yokeTH/gofiber-scalar"
+	"github.com/gofiber/fiber/v3"
 )
+
+// specPath is where the raw OpenAPI document is served; the UI page points at it.
+const specPath = "/docs/openapi.json"
+
+// scalarHTML renders the Scalar API reference against specPath. This replaces
+// github.com/yokeTH/gofiber-scalar, which is built against Fiber v2 and has no
+// v3 release. The page is static and interpolates no request data.
+const scalarHTML = `<!doctype html>
+<html>
+  <head>
+    <title>Veemon API</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script id="api-reference" data-url="` + specPath + `"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>`
 
 // SetupScalar serves the OpenAPI spec and the Scalar API reference UI at /docs.
 func SetupScalar(app *fiber.App) {
+	// Marshal once at startup: this both caches the payload and fails fast if the
+	// spec is not serializable, rather than 500ing on the first docs request.
 	specBytes, err := json.Marshal(GetOpenAPISpec())
 	if err != nil {
 		panic(err)
 	}
 
-	// Serve OpenAPI spec
-	app.Get("/docs/openapi.json", func(c *fiber.Ctx) error {
-		return c.JSON(GetOpenAPISpec())
+	// Registered before the UI routes so the spec path wins the match.
+	app.Get(specPath, func(c fiber.Ctx) error {
+		c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		return c.Send(specBytes)
 	})
 
-	// Serve Scalar UI
-	app.Get("/docs/*", scalar.New(scalar.Config{
-		Title:             "Veemon API",
-		RawSpecUrl:        "openapi.json",
-		FileContentString: string(specBytes),
-	}))
+	// Both the bare path and the wildcard, so /docs and /docs/ both render.
+	ui := func(c fiber.Ctx) error {
+		c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
+		return c.SendString(scalarHTML)
+	}
+	app.Get("/docs", ui)
+	app.Get("/docs/*", ui)
 }
 
 // GetOpenAPISpec returns the OpenAPI specification

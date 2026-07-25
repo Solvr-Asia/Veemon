@@ -4,7 +4,7 @@ package response
 import (
 	"encoding/json"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -30,7 +30,7 @@ func marshalProto(msg proto.Message) (json.RawMessage, error) {
 }
 
 // SuccessProto writes a proto message as the data payload using protojson.
-func SuccessProto(c *fiber.Ctx, msg proto.Message) error {
+func SuccessProto(c fiber.Ctx, msg proto.Message) error {
 	raw, err := marshalProto(msg)
 	if err != nil {
 		return InternalError(c, 500, "failed to encode response")
@@ -39,7 +39,7 @@ func SuccessProto(c *fiber.Ctx, msg proto.Message) error {
 }
 
 // CreatedProto is SuccessProto with a 201 status.
-func CreatedProto(c *fiber.Ctx, msg proto.Message) error {
+func CreatedProto(c fiber.Ctx, msg proto.Message) error {
 	raw, err := marshalProto(msg)
 	if err != nil {
 		return InternalError(c, 500, "failed to encode response")
@@ -48,7 +48,7 @@ func CreatedProto(c *fiber.Ctx, msg proto.Message) error {
 }
 
 // SuccessProtoList writes a list of proto messages plus optional proto meta.
-func SuccessProtoList(c *fiber.Ctx, msgs []proto.Message, meta proto.Message) error {
+func SuccessProtoList(c fiber.Ctx, msgs []proto.Message, meta proto.Message) error {
 	items := make([]json.RawMessage, len(msgs))
 	for i, m := range msgs {
 		raw, err := marshalProto(m)
@@ -77,14 +77,14 @@ type ErrorResponse struct {
 	} `json:"error"`
 }
 
-func Success(c *fiber.Ctx, data interface{}) error {
+func Success(c fiber.Ctx, data interface{}) error {
 	return c.JSON(Response{
 		Success: true,
 		Data:    data,
 	})
 }
 
-func SuccessWithMeta(c *fiber.Ctx, data, meta interface{}) error {
+func SuccessWithMeta(c fiber.Ctx, data, meta interface{}) error {
 	return c.JSON(Response{
 		Success: true,
 		Data:    data,
@@ -92,18 +92,18 @@ func SuccessWithMeta(c *fiber.Ctx, data, meta interface{}) error {
 	})
 }
 
-func Created(c *fiber.Ctx, data interface{}) error {
+func Created(c fiber.Ctx, data interface{}) error {
 	return c.Status(fiber.StatusCreated).JSON(Response{
 		Success: true,
 		Data:    data,
 	})
 }
 
-func NoContent(c *fiber.Ctx) error {
+func NoContent(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func Error(c *fiber.Ctx, status int, code int, message string) error {
+func Error(c fiber.Ctx, status int, code int, message string) error {
 	return c.Status(status).JSON(ErrorResponse{
 		Success: false,
 		Error: struct {
@@ -116,26 +116,26 @@ func Error(c *fiber.Ctx, status int, code int, message string) error {
 	})
 }
 
-func BadRequest(c *fiber.Ctx, code int, message string) error {
+func BadRequest(c fiber.Ctx, code int, message string) error {
 	return Error(c, fiber.StatusBadRequest, code, message)
 }
 
-func Unauthorized(c *fiber.Ctx, message string) error {
+func Unauthorized(c fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusUnauthorized, 401, message)
 }
 
-func Forbidden(c *fiber.Ctx, message string) error {
+func Forbidden(c fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusForbidden, 403, message)
 }
 
-func NotFound(c *fiber.Ctx, message string) error {
+func NotFound(c fiber.Ctx, message string) error {
 	return Error(c, fiber.StatusNotFound, 404, message)
 }
 
-func Conflict(c *fiber.Ctx, code int, message string) error {
+func Conflict(c fiber.Ctx, code int, message string) error {
 	return Error(c, fiber.StatusConflict, code, message)
 }
 
-func InternalError(c *fiber.Ctx, code int, message string) error {
+func InternalError(c fiber.Ctx, code int, message string) error {
 	return Error(c, fiber.StatusInternalServerError, code, message)
 }

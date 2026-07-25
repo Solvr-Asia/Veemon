@@ -24,7 +24,7 @@ import (
 
 // Import paths referenced by generated code.
 const (
-	fiberPkg      = protogen.GoImportPath("github.com/gofiber/fiber/v2")
+	fiberPkg      = protogen.GoImportPath("github.com/gofiber/fiber/v3")
 	middlewarePkg = protogen.GoImportPath("veemon/pkg/middleware")
 	responsePkg   = protogen.GoImportPath("veemon/pkg/response")
 	errorsPkg     = protogen.GoImportPath("veemon/pkg/errors")
@@ -164,8 +164,8 @@ func generateService(g *protogen.GeneratedFile, svc *protogen.Service) error {
 	// --- Shared helpers (one set per service) ---
 	g.P("// _", svcName, "_ctx propagates the auth context (if present) into the")
 	g.P("// request context passed to the handler.")
-	g.P("func _", svcName, "_ctx(c *", fiberCtx, ") ", g.QualifiedGoIdent(contextPkg.Ident("Context")), " {")
-	g.P("\tctx := c.UserContext()")
+	g.P("func _", svcName, "_ctx(c ", fiberCtx, ") ", g.QualifiedGoIdent(contextPkg.Ident("Context")), " {")
+	g.P("\tctx := c.Context()")
 	g.P("\tif ac, ok := ", g.QualifiedGoIdent(middlewarePkg.Ident("GetAuthContext")), "(c); ok {")
 	g.P("\t\tctx = ", g.QualifiedGoIdent(middlewarePkg.Ident("WithAuthContext")), "(ctx, ac)")
 	g.P("\t}")
@@ -175,7 +175,7 @@ func generateService(g *protogen.GeneratedFile, svc *protogen.Service) error {
 
 	g.P("// _", svcName, "_error renders a handler error: AppError values keep their")
 	g.P("// status/message; anything else becomes a sanitized 500.")
-	g.P("func _", svcName, "_error(c *", fiberCtx, ", err error) error {")
+	g.P("func _", svcName, "_error(c ", fiberCtx, ", err error) error {")
 	g.P("\tif appErr, ok := err.(*", g.QualifiedGoIdent(errorsPkg.Ident("AppError")), "); ok {")
 	g.P("\t\treturn appErr.FiberError(c)")
 	g.P("\t}")
@@ -202,7 +202,7 @@ func generateHandler(g *protogen.GeneratedFile, svcName string, m *protogen.Meth
 	isEmpty := string(m.Input.Desc.FullName()) == emptyFullName
 
 	g.P("func _", svcName, "_", m.GoName, "(srv ", svcName, "Server) ", fiberHandler, " {")
-	g.P("\treturn func(c *", fiberCtx, ") error {")
+	g.P("\treturn func(c ", fiberCtx, ") error {")
 
 	if isEmpty {
 		g.P("\t\treq := &", reqType, "{}")
@@ -210,7 +210,8 @@ func generateHandler(g *protogen.GeneratedFile, svcName string, m *protogen.Meth
 		g.P("\t\tvar req ", reqType)
 		// Body binding first, so path params take precedence over body values.
 		if r.GetBody() {
-			g.P("\t\tif err := c.BodyParser(&req); err != nil {")
+			// Fiber v3 replaced c.BodyParser with the Bind() API.
+			g.P("\t\tif err := c.Bind().Body(&req); err != nil {")
 			g.P("\t\t\treturn ", g.QualifiedGoIdent(responsePkg.Ident("BadRequest")), "(c, 400, \"invalid request body\")")
 			g.P("\t\t}")
 		}
@@ -261,15 +262,19 @@ func bindQueryParams(g *protogen.GeneratedFile, m *protogen.Method, skip map[str
 		if skip[jsonName] {
 			continue
 		}
+		// Fiber v3 removed the typed QueryInt/QueryBool accessors in favour of the
+		// generic fiber.Query[T] helper. Defaults stay explicit so a missing or
+		// unparseable value still yields the zero value, as in v2.
+		fiberQuery := g.QualifiedGoIdent(fiberPkg.Ident("Query"))
 		switch field.Desc.Kind() {
 		case protoreflect.StringKind:
 			g.P("\t\treq.", field.GoName, " = c.Query(", strconv(jsonName), ")")
 		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-			g.P("\t\treq.", field.GoName, " = int32(c.QueryInt(", strconv(jsonName), ", 0))")
+			g.P("\t\treq.", field.GoName, " = ", fiberQuery, "[int32](c, ", strconv(jsonName), ", 0)")
 		case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-			g.P("\t\treq.", field.GoName, " = int64(c.QueryInt(", strconv(jsonName), ", 0))")
+			g.P("\t\treq.", field.GoName, " = ", fiberQuery, "[int64](c, ", strconv(jsonName), ", 0)")
 		case protoreflect.BoolKind:
-			g.P("\t\treq.", field.GoName, " = c.QueryBool(", strconv(jsonName), ")")
+			g.P("\t\treq.", field.GoName, " = ", fiberQuery, "[bool](c, ", strconv(jsonName), ", false)")
 		}
 	}
 }

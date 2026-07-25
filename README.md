@@ -75,7 +75,7 @@ them.
 | Component | Technology |
 |-----------|------------|
 | Language | [Go 1.25](https://go.dev/) |
-| Web Framework | [Go Fiber v2](https://gofiber.io/) |
+| Web Framework | [Go Fiber v3](https://gofiber.io/) |
 | gRPC | [google.golang.org/grpc](https://grpc.io/) |
 | ORM | [GORM](https://gorm.io/) |
 | Database | PostgreSQL |
@@ -90,7 +90,7 @@ them.
 | Migrations | [golang-migrate](https://github.com/golang-migrate/migrate) |
 | Resilience | [failsafe-go](https://failsafe-go.dev/) |
 | Metrics | [Prometheus](https://prometheus.io/) |
-| API Docs | [Scalar](https://github.com/yokeTH/gofiber-scalar) |
+| API Docs | [Scalar](https://github.com/scalar/scalar) (served by `docs/scalar.go`) |
 
 ### Web — `apps/web` (`@veemon/web`)
 

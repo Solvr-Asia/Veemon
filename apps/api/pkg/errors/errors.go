@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -33,7 +33,7 @@ func (e *AppError) GRPCStatus() *status.Status {
 	return status.New(e.GRPCCode, e.Message)
 }
 
-func (e *AppError) FiberError(c *fiber.Ctx) error {
+func (e *AppError) FiberError(c fiber.Ctx) error {
 	return c.Status(e.HTTPStatus).JSON(fiber.Map{
 		"success": false,
 		"error": fiber.Map{

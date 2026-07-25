@@ -3,8 +3,8 @@ package middleware
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
 )
 
 // RateLimitConfig holds rate limiter configuration
@@ -14,9 +14,9 @@ type RateLimitConfig struct {
 	// Duration for rate limiting window
 	Duration time.Duration
 	// Key generator function (default: IP-based)
-	KeyGenerator func(*fiber.Ctx) string
+	KeyGenerator func(fiber.Ctx) string
 	// Skip rate limiting for certain requests
-	Skip func(*fiber.Ctx) bool
+	Skip func(fiber.Ctx) bool
 	// Custom response when rate limit exceeded
 	LimitReached fiber.Handler
 	// Storage for distributed rate limiting (nil = in-memory)
@@ -28,15 +28,15 @@ func DefaultRateLimitConfig() RateLimitConfig {
 	return RateLimitConfig{
 		Max:      100,
 		Duration: 1 * time.Minute,
-		KeyGenerator: func(c *fiber.Ctx) string {
+		KeyGenerator: func(c fiber.Ctx) string {
 			return c.IP()
 		},
-		Skip: func(c *fiber.Ctx) bool {
+		Skip: func(c fiber.Ctx) bool {
 			// Skip health check endpoints
 			path := c.Path()
 			return path == "/health" || path == "/ready" || path == "/metrics"
 		},
-		LimitReached: func(c *fiber.Ctx) error {
+		LimitReached: func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"success": false,
 				"error": fiber.Map{
@@ -53,7 +53,7 @@ func RateLimitMiddleware(cfg RateLimitConfig) fiber.Handler {
 	config := limiter.Config{
 		Max:        cfg.Max,
 		Expiration: cfg.Duration,
-		KeyGenerator: func(c *fiber.Ctx) string {
+		KeyGenerator: func(c fiber.Ctx) string {
 			if cfg.KeyGenerator != nil {
 				return cfg.KeyGenerator(c)
 			}
@@ -70,7 +70,7 @@ func RateLimitMiddleware(cfg RateLimitConfig) fiber.Handler {
 
 	handler := limiter.New(config)
 
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// Check if should skip
 		if cfg.Skip != nil && cfg.Skip(c) {
 			return c.Next()
@@ -98,7 +98,7 @@ func RateLimitByEndpointMiddleware(defaults RateLimitConfig, endpoints []Endpoin
 		limiters[key] = limiter.New(limiter.Config{
 			Max:        ep.Max,
 			Expiration: ep.Duration,
-			KeyGenerator: func(c *fiber.Ctx) string {
+			KeyGenerator: func(c fiber.Ctx) string {
 				return c.IP() + ":" + key
 			},
 			LimitReached: defaults.LimitReached,
@@ -112,7 +112,7 @@ func RateLimitByEndpointMiddleware(defaults RateLimitConfig, endpoints []Endpoin
 		LimitReached: defaults.LimitReached,
 	})
 
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if defaults.Skip != nil && defaults.Skip(c) {
 			return c.Next()
 		}
@@ -126,7 +126,7 @@ func RateLimitByEndpointMiddleware(defaults RateLimitConfig, endpoints []Endpoin
 
 // APIKeyRateLimiter creates rate limiting based on API key
 func APIKeyRateLimiter(cfg RateLimitConfig, headerName string) fiber.Handler {
-	cfg.KeyGenerator = func(c *fiber.Ctx) string {
+	cfg.KeyGenerator = func(c fiber.Ctx) string {
 		apiKey := c.Get(headerName)
 		if apiKey == "" {
 			// Fall back to IP if no API key
@@ -140,7 +140,7 @@ func APIKeyRateLimiter(cfg RateLimitConfig, headerName string) fiber.Handler {
 
 // UserRateLimiter creates rate limiting based on authenticated user
 func UserRateLimiter(cfg RateLimitConfig) fiber.Handler {
-	cfg.KeyGenerator = func(c *fiber.Ctx) string {
+	cfg.KeyGenerator = func(c fiber.Ctx) string {
 		// Try to get user from auth context
 		if auth, ok := GetAuthContext(c); ok && auth != nil {
 			return "user:" + auth.UserID

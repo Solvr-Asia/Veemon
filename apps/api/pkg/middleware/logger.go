@@ -3,13 +3,13 @@ package middleware
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
 func LoggerMiddleware(logger *zap.Logger) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		start := time.Now()
 
 		err := c.Next()
@@ -42,7 +42,7 @@ func LoggerMiddleware(logger *zap.Logger) fiber.Handler {
 		}
 
 		// Add trace context if available
-		if span := trace.SpanFromContext(c.UserContext()); span.SpanContext().IsValid() {
+		if span := trace.SpanFromContext(c.Context()); span.SpanContext().IsValid() {
 			fields = append(fields,
 				zap.String("trace_id", span.SpanContext().TraceID().String()),
 				zap.String("span_id", span.SpanContext().SpanID().String()),

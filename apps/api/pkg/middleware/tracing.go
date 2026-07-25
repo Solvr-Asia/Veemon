@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/utils"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/utils/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -14,10 +14,10 @@ import (
 var tracer = otel.Tracer("fiber-middleware")
 
 func TracingMiddleware(serviceName string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// Extract trace context from incoming request headers.
 		propagator := otel.GetTextMapPropagator()
-		ctx := propagator.Extract(c.UserContext(), propagation.HeaderCarrier(c.GetReqHeaders()))
+		ctx := propagator.Extract(c.Context(), propagation.HeaderCarrier(c.GetReqHeaders()))
 
 		// Fiber/fasthttp return zero-copy strings backed by the request buffer,
 		// which is reused after the handler returns. Spans are exported
@@ -54,7 +54,7 @@ func TracingMiddleware(serviceName string) fiber.Handler {
 			span.SetAttributes(attribute.String("request.id", reqID))
 		}
 
-		c.SetUserContext(ctx)
+		c.SetContext(ctx)
 
 		if span.SpanContext().IsValid() {
 			c.Set("X-Trace-ID", span.SpanContext().TraceID().String())

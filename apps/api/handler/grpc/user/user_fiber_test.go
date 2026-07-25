@@ -10,7 +10,7 @@ import (
 
 	"veemon/pkg/middleware"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -65,7 +65,9 @@ func doJSON(t *testing.T, app *fiber.App, method, path, token, body string) (int
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := app.Test(req, -1)
+	// Fiber v3 replaced the millisecond timeout argument with TestConfig; a zero
+	// Timeout disables it, matching v2's -1.
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}

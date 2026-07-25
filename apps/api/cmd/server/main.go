@@ -120,7 +120,7 @@ func main() {
 
 	go func() {
 		log.Info("HTTP server listening", zap.Int("port", cfg.HTTPPort))
-		if err := app.Listen(fmt.Sprintf(":%d", cfg.HTTPPort)); err != nil {
+		if err := app.Listen(fmt.Sprintf(":%d", cfg.HTTPPort), config.NewListenConfig(cfg)); err != nil {
 			errChan <- fmt.Errorf("fiber listen error: %w", err)
 		}
 	}()
