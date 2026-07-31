@@ -83,7 +83,11 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/api
+          # Repo root, not ./apps/api: apps/api/go.mod has a local `replace`
+          # onto ../../packages/go-common, which must be inside the build
+          # context for the Dockerfile to COPY it (see apps/api/Dockerfile).
+          context: .
+          file: apps/api/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
