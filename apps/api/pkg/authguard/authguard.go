@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"veemon/pkg/redis"
+	"veemon-common/infra/redis"
 )
 
 // Guard enforces account lockout and token revocation.

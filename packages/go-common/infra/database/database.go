@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"veemon/entity"
-
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -180,10 +178,12 @@ func New(cfg Config, zapLogger *zap.Logger) (*gorm.DB, error) {
 	return db, nil
 }
 
-func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&entity.User{},
-	)
+// AutoMigrate runs GORM's schema auto-migration for the given models. This
+// package is domain-agnostic (no dependency on any service's entity types),
+// so callers pass their own models explicitly rather than this having a
+// hardcoded list.
+func AutoMigrate(db *gorm.DB, models ...interface{}) error {
+	return db.AutoMigrate(models...)
 }
 
 // WithContext returns a new DB with context for tracing

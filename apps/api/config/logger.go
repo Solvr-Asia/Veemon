@@ -1,11 +1,11 @@
 package config
 
 import (
-	"veemon/pkg/logger"
+	"veemon-common/logging"
 )
 
-func NewLogger(cfg *Config) (*logger.Logger, error) {
-	return logger.New(logger.Config{
+func NewLogger(cfg *Config) (*logging.Logger, error) {
+	return logging.New(logging.Config{
 		Level:       cfg.LogLevel,
 		Format:      cfg.LogFormat,
 		Environment: cfg.Environment,

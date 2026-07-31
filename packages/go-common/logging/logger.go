@@ -1,5 +1,5 @@
-// Package logger provides a structured Zap logger with trace correlation.
-package logger
+// Package logging provides a structured Zap logger with trace correlation.
+package logging
 
 import (
 	"context"

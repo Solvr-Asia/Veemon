@@ -3,8 +3,11 @@ services:
   # source of truth (AutoMigrate is disabled by default).
   migrate:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      # Widened to the repo root: apps/api/go.mod has a local `replace` onto
+      # ../../packages/go-common, which lives outside apps/api and so must be
+      # in the build context for the Dockerfile to COPY it.
+      context: .
+      dockerfile: apps/api/Dockerfile
     command: ["/app/migrate", "up"]
     environment:
       - DB_HOST=postgres
@@ -21,8 +24,11 @@ services:
 
   app:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      # Widened to the repo root: apps/api/go.mod has a local `replace` onto
+      # ../../packages/go-common, which lives outside apps/api and so must be
+      # in the build context for the Dockerfile to COPY it.
+      context: .
+      dockerfile: apps/api/Dockerfile
     ports:
       - "3000:3000"
       - "50051:50051"

@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"veemon/app/usecase/user"
+	"veemon-common/infra/rabbitmq"
+	"veemon-common/infra/redis"
+	"veemon-common/monitoring/metrics"
 	"veemon/docs"
-	"veemon/handler"
 	pb_user "veemon/handler/grpc/user"
 	"veemon/pkg/authguard"
 	"veemon/pkg/errors"
-	"veemon/pkg/metrics"
 	"veemon/pkg/middleware"
-	"veemon/pkg/rabbitmq"
-	"veemon/pkg/redis"
 	"veemon/pkg/token"
-	"veemon/repository/user_repository"
 
 	"github.com/gofiber/fiber/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -25,91 +22,33 @@ import (
 	"gorm.io/gorm"
 )
 
-// BootstrapConfig holds all dependencies for application wiring.
-type BootstrapConfig struct {
-	DB       *gorm.DB
-	App      *fiber.App
-	Log      *zap.Logger
-	Cfg      *Config
-	Redis    *redis.Client
-	RabbitMQ *rabbitmq.Client
-}
+// This file holds the user-domain wiring that used to live in the manual
+// Bootstrap() function: constructing the token service, the login-attempt
+// guard, the token validator, and the gRPC server, plus registering the
+// generated HTTP routes and the observability/health endpoints. Each piece is
+// now an fx.Provide constructor or an fx.Invoke registration (see
+// fx_server.go for the ServerModule that wires them together) — WHO
+// constructs and wires these changed, not the layering itself (repository ->
+// usecase -> handler is untouched).
 
-// BootstrapResult holds the wired components ready to be started.
-type BootstrapResult struct {
-	GRPCServer *grpc.Server
-}
-
-// Bootstrap wires repositories, usecases, handlers, and routes.
-func Bootstrap(b *BootstrapConfig) (*BootstrapResult, error) {
-	// Layers
-	userRepo := user_repository.New(b.DB)
-	userUC := user.NewUseCase(userRepo)
-	tokenService, err := token.NewTokenService(b.Cfg.JWTSecret, b.Cfg.JWTExpiration)
+// provideTokenService builds the PASETO token service from config.
+func provideTokenService(cfg *Config) (*token.TokenService, error) {
+	tokenService, err := token.NewTokenService(cfg.JWTSecret, cfg.JWTExpiration)
 	if err != nil {
 		return nil, fmt.Errorf("init token service: %w", err)
 	}
-	// Login lockout + token revocation, backed by Redis (no-op if Redis is nil).
-	guard := authguard.New(b.Redis, b.Cfg.LoginMaxAttempts, b.Cfg.LoginLockoutMinutes)
-	userHandler := handler.NewUserHandler(userUC, tokenService, guard, b.Log)
-
-	// Token validator
-	tokenValidator := createTokenValidator(tokenService, guard)
-
-	// Observability routes
-	registerObservabilityRoutes(b.App, b.Cfg)
-
-	// Health check
-	registerHealthChecks(b)
-
-	// HTTP routes (generated from veemon.route options in the .proto).
-	pb_user.RegisterUserApiRoutes(b.App, userHandler, tokenValidator)
-
-	// gRPC server. Interceptor order (outermost first): recovery catches panics
-	// from everything downstream, then logging, then auth. Tracing is attached
-	// via the OTel stats handler.
-	grpcServer := grpc.NewServer(
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(
-			middleware.GRPCRecoveryInterceptor(b.Log),
-			middleware.GRPCLoggingInterceptor(b.Log),
-			middleware.GRPCAuthInterceptor(tokenValidator, pb_user.UserApiAuthConfig),
-		),
-	)
-	pb_user.RegisterUserApiServer(grpcServer, userHandler)
-	// Reflection eases local debugging (grpcurl) but exposes the full service
-	// surface; keep it out of production.
-	if b.Cfg.Environment != "production" {
-		reflection.Register(grpcServer)
-	}
-
-	return &BootstrapResult{
-		GRPCServer: grpcServer,
-	}, nil
+	return tokenService, nil
 }
 
-func registerObservabilityRoutes(app *fiber.App, cfg *Config) {
-	m := metrics.Init(cfg.ServiceName)
-	app.Use(m.Middleware())
-	app.Get("/metrics", metricsAuth(cfg.MetricsAuthToken), m.Handler())
-	docs.SetupScalar(app)
+// provideAuthGuard builds the login-lockout + token-revocation guard. A nil
+// Redis client (see provideOptionalRedis) degrades it to a no-op, same as before.
+func provideAuthGuard(redisClient *redis.Client, cfg *Config) *authguard.Guard {
+	return authguard.New(redisClient, cfg.LoginMaxAttempts, cfg.LoginLockoutMinutes)
 }
 
-// metricsAuth optionally guards the /metrics endpoint with a bearer token. When
-// no token is configured it is a pass-through (restrict at the network layer).
-func metricsAuth(token string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		if token == "" {
-			return c.Next()
-		}
-		if c.Get("Authorization") != "Bearer "+token {
-			return errors.Unauthorized("unauthorized").FiberError(c)
-		}
-		return c.Next()
-	}
-}
-
-func createTokenValidator(tokenService *token.TokenService, guard *authguard.Guard) middleware.TokenValidator {
+// provideTokenValidator adapts the token service + guard into the closure
+// shape pkg/middleware expects for REST and gRPC auth.
+func provideTokenValidator(tokenService *token.TokenService, guard *authguard.Guard) middleware.TokenValidator {
 	return func(tokenStr string) (*middleware.AuthContext, error) {
 		claims, err := tokenService.ValidateToken(tokenStr)
 		if err != nil {
@@ -133,19 +72,72 @@ func createTokenValidator(tokenService *token.TokenService, guard *authguard.Gua
 	}
 }
 
-func registerHealthChecks(b *BootstrapConfig) {
-	b.App.Get("/health", func(c fiber.Ctx) error {
+// provideGRPCServer builds the gRPC server with its interceptor chain and
+// registers the UserApi service. Interceptor order (outermost first):
+// recovery catches panics from everything downstream, then logging, then
+// auth. Tracing is attached via the OTel stats handler.
+func provideGRPCServer(log *zap.Logger, tokenValidator middleware.TokenValidator, userHandler pb_user.UserApiServer, cfg *Config) *grpc.Server {
+	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.ChainUnaryInterceptor(
+			middleware.GRPCRecoveryInterceptor(log),
+			middleware.GRPCLoggingInterceptor(log),
+			middleware.GRPCAuthInterceptor(tokenValidator, pb_user.UserApiAuthConfig),
+		),
+	)
+	pb_user.RegisterUserApiServer(grpcServer, userHandler)
+
+	// Reflection eases local debugging (grpcurl) but exposes the full service
+	// surface; keep it out of production.
+	if cfg.Environment != "production" {
+		reflection.Register(grpcServer)
+	}
+
+	return grpcServer
+}
+
+// registerHTTPRoutes wires the generated REST routes (from veemon.route
+// options in the .proto) onto the Fiber app.
+func registerHTTPRoutes(app *fiber.App, userHandler pb_user.UserApiServer, tokenValidator middleware.TokenValidator) {
+	pb_user.RegisterUserApiRoutes(app, userHandler, tokenValidator)
+}
+
+func registerObservabilityRoutes(app *fiber.App, cfg *Config) {
+	m := metrics.Init(cfg.ServiceName)
+	app.Use(m.Middleware())
+	app.Get("/metrics", metricsAuth(cfg.MetricsAuthToken), m.Handler())
+	docs.SetupScalar(app)
+}
+
+// metricsAuth optionally guards the /metrics endpoint with a bearer token. When
+// no token is configured it is a pass-through (restrict at the network layer).
+func metricsAuth(token string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if token == "" {
+			return c.Next()
+		}
+		if c.Get("Authorization") != "Bearer "+token {
+			return errors.Unauthorized("unauthorized").FiberError(c)
+		}
+		return c.Next()
+	}
+}
+
+// registerHealthChecks wires /health (liveness) and /ready (readiness, which
+// actually pings DB/Redis/RabbitMQ rather than just checking non-nil).
+func registerHealthChecks(app *fiber.App, cfg *Config, db *gorm.DB, redisClient *redis.Client, rabbitClient *rabbitmq.Client) {
+	app.Get("/health", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status":  "ok",
-			"service": b.Cfg.ServiceName,
+			"service": cfg.ServiceName,
 		})
 	})
 
-	b.App.Get("/ready", func(c fiber.Ctx) error {
+	app.Get("/ready", func(c fiber.Ctx) error {
 		checks := make(map[string]string)
 
 		// Check database
-		sqlDB, err := b.DB.DB()
+		sqlDB, err := db.DB()
 		if err != nil || sqlDB.Ping() != nil {
 			checks["database"] = "unhealthy"
 		} else {
@@ -153,8 +145,8 @@ func registerHealthChecks(b *BootstrapConfig) {
 		}
 
 		// Check Redis
-		if b.Redis != nil {
-			conn := b.Redis.Conn()
+		if redisClient != nil {
+			conn := redisClient.Conn()
 			_, err := conn.Do("PING")
 			_ = conn.Close()
 			if err != nil {
@@ -167,8 +159,8 @@ func registerHealthChecks(b *BootstrapConfig) {
 		}
 
 		// Check RabbitMQ (actually verify the connection, not just non-nil).
-		if b.RabbitMQ != nil {
-			if err := b.RabbitMQ.Ping(); err != nil {
+		if rabbitClient != nil {
+			if err := rabbitClient.Ping(); err != nil {
 				checks["rabbitmq"] = "unhealthy"
 			} else {
 				checks["rabbitmq"] = "healthy"
@@ -194,4 +186,11 @@ func registerHealthChecks(b *BootstrapConfig) {
 			"status": checks,
 		})
 	})
+}
+
+// registerObservabilityAndHealthRoutes is the fx.Invoke entry point that
+// registers /metrics, the API docs, and the /health + /ready checks.
+func registerObservabilityAndHealthRoutes(app *fiber.App, cfg *Config, db *gorm.DB, redisClient *redis.Client, rabbitClient *rabbitmq.Client) {
+	registerObservabilityRoutes(app, cfg)
+	registerHealthChecks(app, cfg, db, redisClient, rabbitClient)
 }

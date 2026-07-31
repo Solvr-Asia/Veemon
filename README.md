@@ -11,6 +11,8 @@ apps/web/               React 19 + TanStack Router + Vite + Tauri (desktop)
 apps/ai/                LangGraph.js agent + workflow service (TypeScript, Hono)
 packages/api-client/    Generated protobuf-es types + typed REST client (@veemon/api-client)
 packages/tsconfig/      Shared base tsconfig (@veemon/tsconfig)
+packages/go-common/     Shared Go infra module — logging/, monitoring/, infra/
+                        (pulled into apps/api via a go.mod `replace`)
 contract/               Proto contract — the single source of truth (Go + TypeScript)
 CLAUDE.md / AGENTS.md   AI-assistant guidance (indexes into .claude/)
 .claude/                AI config: settings.json (shared) + rules/, agents/, skills/
@@ -48,6 +50,7 @@ targets from that directory (or via the root `bun run *:api` scripts).
 
 - **Dual Protocol**: REST (Fiber) + gRPC in single application
 - **Clean Architecture**: Clear separation of concerns with DDD
+- **Dependency Injection**: uber-go/fx composition root — `cmd/server`/`cmd/worker` are thin `fx.New(...).Run()` entry points (see `config/fx_*.go`)
 - **Database**: PostgreSQL with GORM ORM + OpenTelemetry tracing
 - **Caching**: Redis with Redigo connection pooling
 - **Message Queue**: RabbitMQ for async processing
@@ -91,6 +94,8 @@ them.
 | Resilience | [failsafe-go](https://failsafe-go.dev/) |
 | Metrics | [Prometheus](https://prometheus.io/) |
 | API Docs | [Scalar](https://github.com/scalar/scalar) (served by `docs/scalar.go`) |
+| DI / Composition Root | [uber-go/fx](https://github.com/uber-go/fx) |
+| Shared infra | `packages/go-common` (separate Go module — logging, telemetry/metrics, redis/rabbitmq/resilience/database) |
 
 ### Web — `apps/web` (`@veemon/web`)
 
@@ -134,7 +139,8 @@ Veemon/                              # polyglot Bun-workspace monorepo
 │   │   │   ├── worker/              # RabbitMQ consumer entry point
 │   │   │   ├── migrate/             # Migration + seeding CLI tool
 │   │   │   └── protoc-gen-fiber/    # buf plugin: generates Fiber routes from proto
-│   │   ├── config/                  # Viper config (+ Validate), bootstrap/DI, infra init
+│   │   ├── config/                  # Viper config (+ Validate), fx composition root, infra init
+│   │   │   └── fx_*.go              # fx.Module wiring (CommonModule, ServerModule, WorkerModule)
 │   │   ├── handler/                 # Presentation layer (gRPC impl + generated Fiber routes)
 │   │   │   ├── grpc/veemon/           # Generated veemon.route option types
 │   │   │   ├── grpc/user/           # Generated protobuf / gRPC / Fiber routes
@@ -142,9 +148,9 @@ Veemon/                              # polyglot Bun-workspace monorepo
 │   │   ├── app/usecase/             # Business logic layer
 │   │   ├── repository/              # Data access layer (GORM)
 │   │   ├── entity/                  # Domain entities
-│   │   ├── pkg/                     # Shared infra: token, authguard, middleware, redis,
-│   │   │                            #   rabbitmq, database, resilience, metrics, telemetry,
-│   │   │                            #   logger, response, errors, validation
+│   │   ├── pkg/                     # App-specific shared code: token, authguard, middleware,
+│   │   │                            #   response, errors, validation (auth/presentation-coupled;
+│   │   │                            #   see packages/go-common/ below for generic shared infra)
 │   │   ├── migrations/              # golang-migrate SQL files (schema source of truth)
 │   │   ├── database/                # Migration helper + seeders
 │   │   ├── examples/                # Runnable usage examples (PASETO auth flow)
@@ -166,7 +172,12 @@ Veemon/                              # polyglot Bun-workspace monorepo
 ├── packages/
 │   ├── api-client/                  # @veemon/api-client — generated protobuf-es + typed REST client
 │   │   └── src/gen/                 # Generated TS from contract/ (veemon, user)
-│   └── tsconfig/                    # @veemon/tsconfig — shared base tsconfig
+│   ├── tsconfig/                    # @veemon/tsconfig — shared base tsconfig
+│   └── go-common/                   # Shared Go infra module (not a Bun workspace member) —
+│       ├── logging/                 #   structured Zap logger
+│       ├── monitoring/              #   telemetry/ (OTel) + metrics/ (Prometheus)
+│       ├── infra/                   #   redis/, rabbitmq/, resilience/, database/
+│       └── go.mod · go.sum          #   pulled into apps/api via a `replace`
 ├── contract/                        # Proto contract — single source of truth (Go + TS)
 │   ├── veemon/annotations.proto       # Custom veemon.route option (method/path/auth/rate limit)
 │   └── user/user.proto              # UserApi service with veemon.route annotations
@@ -595,7 +606,7 @@ This boilerplate uses [failsafe-go](https://failsafe-go.dev/) for resilience pat
 Prevents cascading failures by stopping requests to failing services:
 
 ```go
-import "veemon/pkg/resilience"
+import "veemon-common/infra/resilience"
 
 // Create executor with circuit breaker
 executor := resilience.New[*http.Response](
@@ -737,7 +748,7 @@ default; set `METRICS_AUTH_TOKEN` to require `Authorization: Bearer <token>`
 (not the raw path) as the label to bound cardinality.
 
 ```go
-import "veemon/pkg/metrics"
+import "veemon-common/monitoring/metrics"
 
 // Initialize metrics
 m := metrics.Init("myapp")
