@@ -22,20 +22,25 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: apps/api/go.sum
+          cache-dependency-path: |
+            apps/api/go.sum
+            packages/go-common/go.sum
 
-      - name: golangci-lint
+      - name: golangci-lint (apps/api)
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           working-directory: apps/api
 
+      - name: golangci-lint (packages/go-common)
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: packages/go-common
+
   test:
     name: Test (Go)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -45,15 +50,20 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: apps/api/go.sum
+          cache-dependency-path: |
+            apps/api/go.sum
+            packages/go-common/go.sum
 
-      - name: Download dependencies
+      - name: Download dependencies (apps/api)
+        working-directory: apps/api
         run: go mod download
 
-      - name: Vet
+      - name: Vet (apps/api)
+        working-directory: apps/api
         run: go vet ./...
 
-      - name: Run tests (race + coverage)
+      - name: Run tests (apps/api, race + coverage)
+        working-directory: apps/api
         run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage
@@ -63,12 +73,17 @@ jobs:
           path: apps/api/coverage.out
           retention-days: 7
 
+      - name: Vet (packages/go-common)
+        working-directory: packages/go-common
+        run: go vet ./...
+
+      - name: Run tests (packages/go-common, race)
+        working-directory: packages/go-common
+        run: go test -race -count=1 ./...
+
   vuln:
     name: Vulnerability Scan (Go)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,12 +93,19 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: apps/api/go.sum
+          cache-dependency-path: |
+            apps/api/go.sum
+            packages/go-common/go.sum
 
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Run govulncheck
+      - name: Run govulncheck (apps/api)
+        working-directory: apps/api
+        run: govulncheck ./...
+
+      - name: Run govulncheck (packages/go-common)
+        working-directory: packages/go-common
         run: govulncheck ./...
 
   build:
@@ -181,7 +203,11 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/api
+          # Repo root, not ./apps/api: apps/api/go.mod has a local `replace`
+          # onto ../../packages/go-common, which must be inside the build
+          # context for the Dockerfile to COPY it (see apps/api/Dockerfile).
+          context: .
+          file: apps/api/Dockerfile
           push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

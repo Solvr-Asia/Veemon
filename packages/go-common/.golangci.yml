@@ -1,0 +1,56 @@
+# golangci-lint v2 configuration — mirrors apps/api/.golangci.yml so the two
+# Go modules in this monorepo share one lint standard.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  # Start from the standard set (errcheck, govet, ineffassign, staticcheck,
+  # unused) and add high-signal, low-false-positive checks.
+  default: standard
+  enable:
+    - bodyclose
+    - gosec
+    - misspell
+    - unconvert
+    - whitespace
+  settings:
+    misspell:
+      locale: US
+    staticcheck:
+      # Disable "quickfix" style suggestions (QF*) — advisory, not bugs — and
+      # ST1003 (underscore package names), matching apps/api's config.
+      checks:
+        - all
+        - -QF1002
+        - -QF1008
+        - -ST1003
+    errcheck:
+      # Best-effort cleanup (deferred Close/Sync) is intentionally unchecked.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*go.uber.org/zap.Logger).Sync
+    gosec:
+      excludes:
+        - G104 # unhandled errors — already covered by errcheck
+        - G703 # path-traversal false positives on fixed internal paths
+  exclusions:
+    generated: lax
+    rules:
+      # Tests may be looser.
+      - path: _test\.go
+        linters:
+          - bodyclose
+          - errcheck
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - veemon-common

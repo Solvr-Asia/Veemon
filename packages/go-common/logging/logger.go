@@ -83,7 +83,7 @@ func New(cfg Config) (*Logger, error) {
 func (l *Logger) WithContext(ctx context.Context) *zap.Logger {
 	spanCtx := trace.SpanContextFromContext(ctx)
 	if spanCtx.IsValid() {
-		return l.Logger.With(
+		return l.With(
 			zap.String("trace_id", spanCtx.TraceID().String()),
 			zap.String("span_id", spanCtx.SpanID().String()),
 		)
@@ -92,11 +92,11 @@ func (l *Logger) WithContext(ctx context.Context) *zap.Logger {
 }
 
 func (l *Logger) WithRequestID(requestID string) *zap.Logger {
-	return l.Logger.With(zap.String("request_id", requestID))
+	return l.With(zap.String("request_id", requestID))
 }
 
 func (l *Logger) WithFields(fields ...zap.Field) *zap.Logger {
-	return l.Logger.With(fields...)
+	return l.With(fields...)
 }
 
 func (l *Logger) Sync() error {
