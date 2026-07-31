@@ -28,6 +28,55 @@ func TestZapGormLogger_LogMode_ClonesWithoutMutatingOriginal(t *testing.T) {
 	assert.Equal(t, logger.Warn, original.level, "LogMode must not mutate the receiver")
 }
 
+func TestSqlOperationSummary_NeverLeaksInterpolatedValues(t *testing.T) {
+	tests := []struct {
+		name string
+		sql  string
+		want string
+	}{
+		{
+			name: "select",
+			sql:  `SELECT * FROM "users" WHERE email = 'user@example.com' LIMIT 1`,
+			want: "SELECT users",
+		},
+		{
+			name: "insert with sensitive literals in VALUES",
+			sql:  `INSERT INTO "users" ("email","password","name") VALUES ('user@example.com','$2a$10$abcdefghijklmnopqrstuv','Jane Doe')`,
+			want: `INSERT INTO users`,
+		},
+		{
+			name: "update with sensitive literal in SET",
+			sql:  `UPDATE "users" SET "password" = '$2a$10$abcdefghijklmnopqrstuv' WHERE "id" = 42`,
+			want: "UPDATE users",
+		},
+		{
+			name: "delete",
+			sql:  `DELETE FROM "users" WHERE "id" = 42`,
+			want: "DELETE FROM users",
+		},
+		{
+			name: "unrecognized statement falls back safely",
+			sql:  `EXPLAIN ANALYZE SELECT 1`,
+			want: "unknown",
+		},
+		{
+			name: "empty string falls back safely",
+			sql:  "",
+			want: "unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sqlOperationSummary(tt.sql)
+
+			assert.Equal(t, tt.want, got)
+			assert.NotContains(t, got, "user@example.com", "summary must never contain a literal bound value")
+			assert.NotContains(t, got, "$2a$10$", "summary must never contain a literal bound value (password hash)")
+		})
+	}
+}
+
 // unusedTCPAddr reserves a free local port, then immediately releases it, to
 // guarantee a real "connection refused" from a closed port on dial.
 func unusedTCPAddr(t *testing.T) (string, int) {

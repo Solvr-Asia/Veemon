@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"veemon-common/logging"
 	"veemon-common/monitoring/metrics"
 	"veemon/app/usecase/user"
 	pb "veemon/handler/grpc/user"
@@ -23,12 +24,12 @@ type userHandler struct {
 	userUC       user.UseCase
 	tokenService *token.TokenService
 	guard        *authguard.Guard
-	logger       *zap.Logger
+	logger       *logging.Logger
 }
 
-func NewUserHandler(userUC user.UseCase, tokenService *token.TokenService, guard *authguard.Guard, logger *zap.Logger) pb.UserApiServer {
+func NewUserHandler(userUC user.UseCase, tokenService *token.TokenService, guard *authguard.Guard, logger *logging.Logger) pb.UserApiServer {
 	if logger == nil {
-		logger = zap.NewNop()
+		logger = &logging.Logger{Logger: zap.NewNop()}
 	}
 	return &userHandler{
 		userUC:       userUC,
@@ -40,8 +41,12 @@ func NewUserHandler(userUC user.UseCase, tokenService *token.TokenService, guard
 
 // internal logs the underlying cause of a 5xx (which is never sent to clients)
 // and returns a sanitized error carrying only a stable code and public message.
-func (h *userHandler) internal(code int, publicMsg string, cause error) error {
-	h.logger.Error("internal handler error",
+// Logging through logger.WithContext(ctx) attaches trace_id/span_id when a
+// span is active (both the REST and gRPC paths carry one), so a 500 traced
+// here is findable in the OTel backend by trace — this is the single
+// error-logging chokepoint for every handler method below.
+func (h *userHandler) internal(ctx context.Context, code int, publicMsg string, cause error) error {
+	h.logger.WithContext(ctx).Error("internal handler error",
 		zap.Int("code", code),
 		zap.String("message", publicMsg),
 		zap.Error(cause),
@@ -65,7 +70,7 @@ func (h *userHandler) Register(ctx context.Context, req *pb.RegisterReq) (*pb.Re
 		if err == user.ErrEmailExists {
 			return nil, errors.Conflict(40901, "email already registered")
 		}
-		return nil, h.internal(50001, "failed to register user", err)
+		return nil, h.internal(ctx, 50001, "failed to register user", err)
 	}
 
 	if m := metrics.Get(); m != nil {
@@ -99,7 +104,7 @@ func (h *userHandler) Login(ctx context.Context, req *pb.LoginReq) (*pb.LoginRes
 		case err == user.ErrUserNotActive:
 			return nil, errors.Forbidden("account is not active")
 		default:
-			return nil, h.internal(50002, "failed to login", err)
+			return nil, h.internal(ctx, 50002, "failed to login", err)
 		}
 	}
 
@@ -118,7 +123,7 @@ func (h *userHandler) Login(ctx context.Context, req *pb.LoginReq) (*pb.LoginRes
 		userEntity.CompanyCode,
 	)
 	if err != nil {
-		return nil, h.internal(50003, "failed to generate token", err)
+		return nil, h.internal(ctx, 50003, "failed to generate token", err)
 	}
 
 	return &pb.LoginRes{
@@ -152,7 +157,7 @@ func (h *userHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenReq)
 		if err == user.ErrNotFound {
 			return nil, errors.Unauthorized("user no longer exists")
 		}
-		return nil, h.internal(50010, "failed to refresh token", err)
+		return nil, h.internal(ctx, 50010, "failed to refresh token", err)
 	}
 	if string(profile.Status) != "active" {
 		return nil, errors.Forbidden("account is not active")
@@ -170,7 +175,7 @@ func (h *userHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenReq)
 		profile.CompanyCode,
 	)
 	if err != nil {
-		return nil, h.internal(50010, "failed to refresh token", err)
+		return nil, h.internal(ctx, 50010, "failed to refresh token", err)
 	}
 
 	return &pb.RefreshTokenRes{
@@ -190,7 +195,7 @@ func (h *userHandler) GetMe(ctx context.Context, req *emptypb.Empty) (*pb.UserPr
 		if err == user.ErrNotFound {
 			return nil, errors.NotFound("user not found")
 		}
-		return nil, h.internal(50004, "failed to get profile", err)
+		return nil, h.internal(ctx, 50004, "failed to get profile", err)
 	}
 
 	return &pb.UserProfile{
@@ -235,7 +240,7 @@ func (h *userHandler) ListUsers(ctx context.Context, req *pb.ListUsersReq) (*pb.
 		SortOrder: req.SortOrder,
 	})
 	if err != nil {
-		return nil, h.internal(50005, "failed to list users", err)
+		return nil, h.internal(ctx, 50005, "failed to list users", err)
 	}
 
 	pbUsers := make([]*pb.UserProfile, len(users))
@@ -274,7 +279,7 @@ func (h *userHandler) GetUser(ctx context.Context, req *pb.GetUserReq) (*pb.User
 		if err == user.ErrNotFound {
 			return nil, errors.NotFound("user not found")
 		}
-		return nil, h.internal(50006, "failed to get user", err)
+		return nil, h.internal(ctx, 50006, "failed to get user", err)
 	}
 
 	return &pb.UserProfile{
@@ -305,7 +310,7 @@ func (h *userHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserReq) (*p
 		if err == user.ErrNotFound {
 			return nil, errors.NotFound("user not found")
 		}
-		return nil, h.internal(50007, "failed to update user", err)
+		return nil, h.internal(ctx, 50007, "failed to update user", err)
 	}
 
 	return &pb.UserProfile{
@@ -329,7 +334,7 @@ func (h *userHandler) DeleteUser(ctx context.Context, req *pb.DeleteUserReq) (*p
 		if err == user.ErrNotFound {
 			return nil, errors.NotFound("user not found")
 		}
-		return nil, h.internal(50008, "failed to delete user", err)
+		return nil, h.internal(ctx, 50008, "failed to delete user", err)
 	}
 
 	return &pb.DeleteUserRes{

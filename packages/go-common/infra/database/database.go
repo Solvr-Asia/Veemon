@@ -4,6 +4,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -19,9 +21,11 @@ type zapGormLogger struct {
 	level         logger.LogLevel
 }
 
-// newZapGormLogger defaults to Warn: successful queries (whose interpolated SQL
-// can contain sensitive values such as password hashes) are not logged, only
-// slow queries and errors. Raise the level via LogMode for debugging.
+// newZapGormLogger defaults to Warn: successful queries are noisy at scale, so
+// only slow queries and errors are logged by default (raise via LogMode for
+// debugging). Regardless of level, Trace logs only a low-cardinality
+// operation+table summary — never GORM's fully-interpolated SQL, which bakes
+// literal bound values (e.g. a user's email or password hash) into the text.
 func newZapGormLogger(zapLogger *zap.Logger) *zapGormLogger {
 	return &zapGormLogger{
 		logger:        zapLogger,
@@ -54,6 +58,31 @@ func (l *zapGormLogger) Error(ctx context.Context, msg string, data ...interface
 	}
 }
 
+// sqlSelectRe extracts the target table from a SELECT's FROM clause (the
+// column list between SELECT and FROM is discarded, not just skipped, so it
+// can never carry a literal value). sqlWriteRe extracts the table/target name
+// that immediately follows a write verb (e.g. "INSERT INTO users"). Both
+// deliberately discard everything else in the statement — the WHERE/VALUES/
+// SET clauses are exactly where GORM's interpolation puts literal values.
+var (
+	sqlSelectRe = regexp.MustCompile(`(?is)^\s*SELECT\b.*?\bFROM\s+([^\s(]+)`)
+	sqlWriteRe  = regexp.MustCompile(`(?is)^\s*(INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\s+([^\s(]+)`)
+)
+
+// sqlOperationSummary reduces a GORM-interpolated SQL string to a safe,
+// low-cardinality "OPERATION table" summary for logging. It never returns any
+// part of the original statement beyond the verb and target name, so it
+// cannot carry bound literal values (PII, secrets) regardless of the query.
+func sqlOperationSummary(sql string) string {
+	if m := sqlSelectRe.FindStringSubmatch(sql); m != nil {
+		return "SELECT " + strings.Trim(m[1], `"`)
+	}
+	if m := sqlWriteRe.FindStringSubmatch(sql); m != nil {
+		return strings.ToUpper(strings.Join(strings.Fields(m[1]), " ")) + " " + strings.Trim(m[2], `"`)
+	}
+	return "unknown"
+}
+
 func (l *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
 	if l.level <= logger.Silent {
 		return
@@ -62,10 +91,14 @@ func (l *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 	elapsed := time.Since(begin)
 	sql, rows := fc()
 
+	// Never log the fully-interpolated statement returned by fc(): GORM bakes
+	// literal bound values into it, which for writes to sensitive tables (e.g.
+	// users) would leak PII/secrets (email, password hash) into the log. Log
+	// only a low-cardinality operation+table summary instead.
 	fields := []zap.Field{
 		zap.Duration("elapsed", elapsed),
 		zap.Int64("rows", rows),
-		zap.String("sql", sql),
+		zap.String("sql_summary", sqlOperationSummary(sql)),
 	}
 
 	switch {
