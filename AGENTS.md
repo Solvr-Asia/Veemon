@@ -44,3 +44,9 @@ unless noted; start with
   panics at startup.
 - **golang-migrate is authoritative** — schema changes go through SQL migrations.
 - **Always** `go test -race ./...` for new behavior; never log secrets.
+- **Composition root, not `main()`** — `cmd/server`/`cmd/worker` are thin
+  `fx.New(...).Run()` entry points; wiring lives in `config/fx_*.go`
+  (`CommonModule`/`ServerModule`/`WorkerModule`). `apps/ai`'s `composition.ts`
+  uses Awilix the same way. Shared Go infra (logging, telemetry/metrics,
+  redis/rabbitmq/resilience/database) lives in `packages/go-common` — a
+  separate module, not `apps/api/pkg`.
