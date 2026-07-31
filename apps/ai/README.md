@@ -29,7 +29,8 @@ src/
     checkpointer/            MemorySaver | PostgresSaver factory
   interface/http/server.ts   Hono routes (invoke + SSE stream)
   config.ts                  env config (validated, fail-fast)
-  composition.ts             composition root — wires everything
+  composition.ts             composition root — registers config/adapters/graphs
+                             into an Awilix container, resolved via `.cradle`
   main.ts                    entry point (Bun serves the default export)
 ```
 
