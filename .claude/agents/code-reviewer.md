@@ -23,7 +23,7 @@ and apply the rules in:
 - [database](../rules/database.md) / [redis](../rules/redis.md) — context timeouts, transactions, N+1, pooling, closed connections.
 - [security](../rules/security.md) — OWASP Top 10; parameterized queries, RBAC on every route/RPC, bcrypt, no secrets in code/logs.
 - [testing](../rules/testing.md) — table-driven tests + `go test -race` for new behavior.
-- [logging](../rules/logging.md) — structured Zap fields, never log secrets.
+- [observability](../rules/observability.md) — structured Zap fields, no secrets/PII, bounded metric labels, correlation via `request_id`.
 
 ## How to run
 

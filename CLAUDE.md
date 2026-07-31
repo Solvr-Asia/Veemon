@@ -22,7 +22,7 @@ authoritative for `apps/api` (the Go backend).
 | [database](.claude/rules/database.md) | GORM usage, transactions, connection pool |
 | [redis](.claude/rules/redis.md) | Redigo connection pooling |
 | [testing](.claude/rules/testing.md) | Table-driven tests, mocks, race detection |
-| [logging](.claude/rules/logging.md) | Structured Zap logging, no secrets |
+| [observability](.claude/rules/observability.md) | Logging shape, metric/span conventions, correlation, no secrets/PII |
 | [security](.claude/rules/security.md) | OWASP Top 10 with Go examples |
 | [api-responses](.claude/rules/api-responses.md) | Success / error / pagination envelopes |
 | [commands](.claude/rules/commands.md) | Common `make` / `bun` commands |
