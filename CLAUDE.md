@@ -36,6 +36,21 @@ authoritative for `apps/api` (the Go backend).
 
 - [proto-routes](.claude/skills/proto-routes/SKILL.md) — add/change a REST+gRPC endpoint via the proto contract, then `make proto`.
 
+## Quick rules of thumb
+
+- **REST routes are generated** — change `contract/<svc>/<svc>.proto` and run
+  `make proto`; never hand-edit Fiber routes or the auth map.
+- **Auth is fail-closed** — every route/RPC needs an explicit policy or the server
+  panics at startup.
+- **golang-migrate is authoritative** — schema changes go through SQL migrations.
+- **Always** `go test -race ./...` for new behavior; never log secrets.
+- **Composition root, not `main()`** — `cmd/server`/`cmd/worker` are thin
+  `fx.New(...).Run()` entry points; wiring lives in `config/fx_*.go`
+  (`CommonModule`/`ServerModule`/`WorkerModule`). `apps/ai`'s `composition.ts`
+  uses Awilix the same way. Shared Go infra (logging, telemetry/metrics,
+  redis/rabbitmq/resilience/database) lives in `packages/go-common` — a
+  separate module, not `apps/api/pkg`.
+
 ## Related docs
 
 - [README.md](README.md) — full project documentation.

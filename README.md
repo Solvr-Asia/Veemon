@@ -118,6 +118,7 @@ them.
 | Persistence | LangGraph checkpointer — in-memory or [Postgres](https://github.com/langchain-ai/langgraphjs) |
 | Schemas | [Zod](https://zod.dev/) |
 | API access | `@veemon/api-client` (typed REST over the Go API) |
+| DI / Composition Root | [Awilix](https://github.com/jeffijoe/awilix) (function-based, see `src/composition.ts`) |
 
 ### Contract & tooling (shared)
 
@@ -167,7 +168,8 @@ Veemon/                              # polyglot Bun-workspace monorepo
 │   │   ├── index.html · vite.config.ts · tsconfig.json
 │   │   └── README.md
 │   └── ai/                          # LangGraph.js agent + workflow service (@veemon/ai)
-│       ├── src/                     # domain/, application/, infrastructure/, interface/http, composition.ts
+│       ├── src/                     # domain/, application/, infrastructure/, interface/http
+│       │   └── composition.ts       # Composition root — Awilix container
 │       └── README.md
 ├── packages/
 │   ├── api-client/                  # @veemon/api-client — generated protobuf-es + typed REST client
