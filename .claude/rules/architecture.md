@@ -24,7 +24,8 @@ Go module (pulled into apps/api via a `replace` in `go.mod`) holding
 `infra/{redis,rabbitmq,resilience,database}/` (generic infra clients). This
 mirrors the root `packages/` convention already used on the TS side
 (`packages/api-client`, `packages/tsconfig`), ready for reuse if a second Go
-service ever joins this monorepo.
+service ever joins this monorepo. See [observability.md](observability.md) for
+logging/metrics/tracing conventions on top of it.
 
 **Composition root:** `cmd/server/main.go` and `cmd/worker/main.go` are thin
 `fx.New(...).Run()` calls — all wiring (repository → usecase → handler →
