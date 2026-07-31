@@ -5,11 +5,11 @@ import (
 	"context"
 	"time"
 
+	"veemon-common/monitoring/metrics"
 	"veemon/app/usecase/user"
 	pb "veemon/handler/grpc/user"
 	"veemon/pkg/authguard"
 	"veemon/pkg/errors"
-	"veemon/pkg/metrics"
 	"veemon/pkg/middleware"
 	"veemon/pkg/token"
 

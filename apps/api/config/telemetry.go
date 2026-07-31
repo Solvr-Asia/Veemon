@@ -3,7 +3,7 @@ package config
 import (
 	"context"
 
-	"veemon/pkg/telemetry"
+	"veemon-common/monitoring/telemetry"
 )
 
 func NewTelemetry(ctx context.Context, cfg *Config) (*telemetry.Telemetry, error) {

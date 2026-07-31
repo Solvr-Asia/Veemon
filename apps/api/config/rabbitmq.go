@@ -1,7 +1,7 @@
 package config
 
 import (
-	"veemon/pkg/rabbitmq"
+	"veemon-common/infra/rabbitmq"
 
 	"go.uber.org/zap"
 )

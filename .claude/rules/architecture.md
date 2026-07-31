@@ -11,10 +11,27 @@ handler/        → Presentation layer (gRPC handler impl + generated Fiber rout
 app/usecase/    → Business logic layer (depends on the repository interface)
 repository/     → Data access layer (GORM)
 entity/         → Domain entities
-pkg/            → Shared infrastructure (token, authguard, middleware, rabbitmq,
-                  redis, database, resilience, metrics, telemetry, logger, errors, …)
+pkg/            → App-specific shared code (token, authguard, middleware,
+                  response, errors, validation) — auth/presentation-coupled,
+                  not generically reusable
 migrations/     → golang-migrate SQL files (the schema source of truth)
 ```
+
+**Shared infra lives outside `apps/`, in `packages/go-common`** — a separate
+Go module (pulled into apps/api via a `replace` in `go.mod`) holding
+`logging/` (structured Zap logger), `monitoring/telemetry/` +
+`monitoring/metrics/` (OTel tracing + Prometheus), and
+`infra/{redis,rabbitmq,resilience,database}/` (generic infra clients). This
+mirrors the root `packages/` convention already used on the TS side
+(`packages/api-client`, `packages/tsconfig`), ready for reuse if a second Go
+service ever joins this monorepo.
+
+**Composition root:** `cmd/server/main.go` and `cmd/worker/main.go` are thin
+`fx.New(...).Run()` calls — all wiring (repository → usecase → handler →
+routes, infra init, and lifecycle-managed start/stop) lives in
+`config/fx_*.go` (`CommonModule`, `ServerModule`, `WorkerModule`). `go.uber.org/fx`'s
+`fx.Lifecycle` (`OnStart`/`OnStop` hooks) replaces the hand-rolled goroutines +
+signal handling + ordered shutdown that used to live in both main.go files.
 
 **REST routes are generated, not hand-written.** Declare a route with a
 `veemon.route` option on the RPC in `contract/<svc>/<svc>.proto` (method, path,

@@ -155,7 +155,7 @@ From your main application, publish messages to be consumed by the worker:
 ```go
 import (
     "context"
-    "veemon/pkg/rabbitmq"
+    "veemon-common/infra/rabbitmq"
 )
 
 // In your service or handler

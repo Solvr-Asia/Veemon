@@ -59,5 +59,10 @@ formatters:
     - goimports
   settings:
     goimports:
+      # goimports groups a "local" import by a plain string-prefix match (no
+      # trailing "/" required), so "veemon" already matches "veemon-common/..."
+      # imports (the packages/go-common module, wired in via a go.mod replace)
+      # too — no separate entry needed. Verified against the installed
+      # golangci-lint's vendored golang.org/x/tools/internal/imports.
       local-prefixes:
         - veemon

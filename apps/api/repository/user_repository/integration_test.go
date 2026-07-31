@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"testing"
 
+	"veemon-common/infra/database"
 	"veemon/entity"
-	"veemon/pkg/database"
 	"veemon/repository/user_repository"
 
 	"github.com/google/uuid"

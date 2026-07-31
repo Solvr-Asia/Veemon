@@ -1,0 +1,43 @@
+# Repo-root .dockerignore: the apps/api build context is now the monorepo
+# root (docker-compose.yml `context: .`), not apps/api, because apps/api's
+# go.mod has a local `replace` onto ../../packages/go-common, a sibling of
+# apps/api. The Dockerfile only COPYs apps/api/ and packages/go-common/, but
+# everything else here still gets scanned/sent to the daemon unless excluded
+# — most importantly the other apps' node_modules/build output, which are
+# large and irrelevant to the Go build.
+.env
+.env.local
+.env.*.local
+.git
+.gitignore
+.github
+bin/
+dist/
+build/
+tmp/
+temp/
+vendor/
+*.log
+logs/
+coverage.out
+coverage.html
+*.test
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+README.md
+CHANGES.md
+SUMMARY.md
+GO_FIBER_DDD_BOILERPLATE.md
+.claude/
+
+# Other apps/packages not needed to build apps/api (their own Go module +
+# packages/go-common are all this Dockerfile actually COPYs).
+node_modules/
+apps/ai/
+apps/web/
+packages/api-client/
+packages/tsconfig/
+**/src-tauri/target/
+.worktrees/

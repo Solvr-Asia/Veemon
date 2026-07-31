@@ -1,7 +1,7 @@
 package config
 
 import (
-	"veemon/pkg/redis"
+	"veemon-common/infra/redis"
 )
 
 func NewRedis(cfg *Config) (*redis.Client, error) {

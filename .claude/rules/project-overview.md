@@ -24,6 +24,8 @@ The Go backend (`apps/api`) is a Go monolithic application using:
 - **failsafe-go** for resilience (circuit breaker, retry, timeout)
 - **Prometheus** for metrics and monitoring
 - **Scalar** for API documentation (OpenAPI 3)
+- **uber-go/fx** for dependency injection — `cmd/server`/`cmd/worker` are thin
+  `fx.New(...).Run()` composition roots (see `config/fx_*.go`)
 
 ## Monorepo Layout
 
@@ -33,6 +35,9 @@ apps/web/       → React + TanStack Router + Vite + Tauri (@veemon/web)
 apps/ai/        → LangGraph.js agent + workflow service (@veemon/ai, Hono HTTP)
 packages/api-client/ → generated protobuf-es types + typed REST client (@veemon/api-client)
 packages/tsconfig/   → shared base tsconfig (@veemon/tsconfig)
+packages/go-common/  → shared Go infra module (logging/, monitoring/, infra/) —
+                       pulled into apps/api via a go.mod `replace`, not a Bun
+                       workspace member
 contract/       → proto source of truth (repo root) — generates Go + TS
 buf.gen.yaml    → Go → apps/api/handler/grpc; TS → packages/api-client/src/gen
 package.json    → Bun workspaces + root scripts (proto, dev, build, test)

@@ -3,7 +3,8 @@ package config
 import (
 	"time"
 
-	"veemon/pkg/database"
+	"veemon-common/infra/database"
+	"veemon/entity"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -38,7 +39,7 @@ func NewDatabase(cfg *Config, log *zap.Logger) (*gorm.DB, error) {
 	if cfg.DBAutoMigrate {
 		log.Warn("DB_AUTO_MIGRATE is enabled; GORM AutoMigrate is running. " +
 			"Use golang-migrate (`make migrate`) as the source of truth in production.")
-		if err := database.AutoMigrate(db); err != nil {
+		if err := database.AutoMigrate(db, &entity.User{}); err != nil {
 			return nil, err
 		}
 	}
